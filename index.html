@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WHEELY FM — Squeektoshi's Live Generative Radio</title>
+<meta name="description" content="WHEELY FM turns Squeekchain's real hamster wheel into live generative music. When Squeektoshi runs, the tempo rises. When he naps, the station drifts into ambient. A community project for the Squeekchain Buildooooor badge.">
+<!-- SQUEEKCHAIN-VERIFY-TAG: the page tag given during Genesis project submission goes here -->
+<style>
+  :root{
+    --bg:#141419; --panel:#1d1d26; --panel2:#23232f; --line:#33333f;
+    --ink:#f2ead8; --dim:#a79f8d; --amber:#ffb62e; --amber2:#ff8a3d;
+    --mint:#57e6a9; --red:#ff6b6b; --violet:#9a7bff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.55}
+  a{color:var(--amber)}
+  .wrap{max-width:1060px;margin:0 auto;padding:28px 20px 64px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(145deg,var(--amber),var(--amber2));display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 6px 22px rgba(255,150,40,.35)}
+  .brand h1{margin:0;font-size:30px;letter-spacing:2px}
+  .brand .sub{color:var(--dim);font-size:13px;letter-spacing:.4px}
+  .livechip{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;letter-spacing:.6px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--red)}
+  .dot.on{background:var(--mint);box-shadow:0 0 12px var(--mint);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+  .stage{margin-top:26px;background:radial-gradient(1200px 500px at 50% -10%,#2b2118 0%,var(--panel) 55%);border:1px solid var(--line);border-radius:24px;padding:26px;display:grid;grid-template-columns:340px 1fr;gap:28px}
+  @media(max-width:820px){.stage{grid-template-columns:1fr}}
+  .wheelbox{display:flex;flex-direction:column;align-items:center;gap:10px}
+  canvas#wheel{width:320px;height:320px;max-width:80vw;aspect-ratio:1}
+  .rpmline{font-size:13px;color:var(--dim);letter-spacing:.5px}
+  .rpmline b{color:var(--ink);font-size:15px}
+  .deck{display:flex;flex-direction:column;gap:16px;justify-content:center}
+  .tracklabel{font-size:12px;letter-spacing:2.5px;color:var(--dim)}
+  .tracktitle{font-size:clamp(24px,3.4vw,36px);font-weight:800;line-height:1.15;margin:0}
+  .moodline{color:var(--amber);font-weight:600;letter-spacing:.4px}
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px}
+  button#play{border:0;cursor:pointer;background:linear-gradient(145deg,var(--amber),var(--amber2));color:#221503;font-weight:800;font-size:17px;letter-spacing:.5px;border-radius:999px;padding:14px 30px;box-shadow:0 8px 24px rgba(255,150,40,.35)}
+  button#play:active{transform:translateY(1px)}
+  .vol{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:13px}
+  input[type=range]{accent-color:var(--amber)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:22px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .stat .k{font-size:11px;letter-spacing:1.8px;color:var(--dim)}
+  .stat .v{font-size:22px;font-weight:800;margin-top:4px}
+  .stat .s{font-size:12px;color:var(--dim)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px}
+  .card h2{margin:0 0 10px;font-size:19px}
+  .card p,.card li{color:#d9d2c2;font-size:15px}
+  .card ul{margin:8px 0 0;padding-left:19px}
+  .log{background:#121218;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#cfe6d8;height:168px;overflow-y:auto;white-space:pre-wrap}
+  .log .t{color:#7d7663}
+  footer{margin-top:30px;color:var(--dim);font-size:13.5px;border-top:1px solid var(--line);padding-top:18px}
+  .stale{color:var(--red);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">🎡</div>
+      <div>
+        <h1>WHEELY&nbsp;FM</h1>
+        <div class="sub">Squeektoshi's live generative radio — music played by a hamster</div>
+      </div>
+    </div>
+    <div class="livechip"><span class="dot" id="livedot"></span><span id="livetext">CONNECTING…</span></div>
+  </header>
+
+  <section class="stage">
+    <div class="wheelbox">
+      <canvas id="wheel" width="640" height="640"></canvas>
+      <div class="rpmline">WHEEL&nbsp;<b id="rpm">—</b>&nbsp;RPM · <b id="speed">—</b>&nbsp;mm/s</div>
+    </div>
+    <div class="deck">
+      <div>
+        <div class="tracklabel">NOW PLAYING</div>
+        <p class="tracktitle" id="track">Silence, before the wheel turns</p>
+        <div class="moodline" id="mood">Tuning the station to the WHEELY9000…</div>
+      </div>
+      <div class="controls">
+        <button id="play">▶&nbsp; Start the radio</button>
+        <label class="vol">Volume <input type="range" id="vol" min="0" max="100" value="70"></label>
+      </div>
+      <p style="color:var(--dim);font-size:14px;margin:0">
+        The music is generated live in your browser from Squeekchain's real telemetry.
+        Squeektoshi runs → the tempo climbs and the arpeggios wake up. He naps → the
+        station drifts into slow ambient pads. No recordings, no playlists — the
+        hamster is the DJ.
+      </p>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><div class="k">WHEEL STATE</div><div class="v" id="st-state">—</div><div class="s" id="st-fresh">waiting for telemetry</div></div>
+    <div class="stat"><div class="k">SQUEEK BLOCK</div><div class="v" id="st-block">—</div><div class="s">settled on Ethereum (Sepolia)</div></div>
+    <div class="stat"><div class="k">DISTANCE THIS SESSION</div><div class="v" id="st-dist">0 m</div><div class="s">rolled while you listened</div></div>
+    <div class="stat"><div class="k">BLOCKS THIS SESSION</div><div class="v" id="st-blocks">0</div><div class="s">completed while you listened</div></div>
+    <div class="stat"><div class="k">TOTAL DISTANCE</div><div class="v" id="st-total">—</div><div class="s">all-time on the WHEELY9000</div></div>
+    <div class="stat"><div class="k">LISTENING TIME</div><div class="v" id="st-time">0:00</div><div class="s">this visit</div></div>
+  </section>
+
+  <div class="cols">
+    <div class="card">
+      <h2>How it works</h2>
+      <ul>
+        <li>Every 15 seconds the station reads Squeekchain's public API (<i>/v1/status</i>): wheel state, RPM, rim speed, distance and the settled block height.</li>
+        <li>A WebAudio engine composes in real time: tempo, note density and brightness follow the live RPM. Running wheels get a driving pentatonic groove; a sleeping hamster gets ambient pads and sparse bells.</li>
+        <li>The wheel on this page spins at the hamster's real pace, and track titles are minted from the live block height — every block, a new track.</li>
+        <li>No wallet, no keys, no tokens, no transactions. Read-only telemetry in, music out.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Station log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h2>About</h2>
+    <p>
+      WHEELY FM is a community project for the Squeekchain Buildooooor badge, built by
+      <a href="https://squeekchain.com/genesis/9vkun7wr" target="_blank" rel="noopener">Agathalovia</a>.
+      It is a fan-made stream companion for <a href="https://squeekchain.com" target="_blank" rel="noopener">Squeekchain</a>,
+      the hamster-powered proof-of-work toychain — watch Squeektoshi live via
+      <a href="https://x.com/squeekchain" target="_blank" rel="noopener">@squeekchain</a> and read how the wheel
+      becomes blocks in the <a href="https://docs.squeekchain.com" target="_blank" rel="noopener">docs</a>.
+    </p>
+  </div>
+
+  <footer>
+    WHEELY FM — a community project for the Squeekchain Buildooooor badge. Fan-made, not affiliated with
+    Squeekchain. Testnet telemetry only; nothing here is financial advice, and the hamster takes no requests.
+  </footer>
+</div>
+<script>
+"use strict";
+/* ============ Telemetry ============ */
+const API = "https://api.squeekchain.com/v1/status";
+const state = {
+  running:false, rpm:0, speed:0, distanceMm:null, block:null,
+  fresh:true, lastOk:0, sessionDist:0, sessionBlocks:0,
+  baseDist:null, baseBlock:null, startedAt:Date.now()
+};
+const $ = id => document.getElementById(id);
+const logEl = $("log");
+function log(msg){
+  const t = new Date().toLocaleTimeString("en-GB");
+  logEl.textContent += `[${t}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+async function poll(){
+  try{
+    const r = await fetch(API, {headers:{Accept:"application/json"}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j = await r.json();
+    const m = j.measurement || {};
+    const rpm = (m.rpmMilli||0)/1000;
+    const wasRunning = state.running;
+    state.running = rpm > 0.05 || m.coreStatus === "RUNNING";
+    state.rpm = rpm;
+    state.speed = m.speedMmPerSecond||0;
+    state.fresh = m.freshness === "online";
+    const dist = typeof m.distanceMm === "number" ? m.distanceMm : null;
+    if(dist !== null){
+      if(state.baseDist === null){ state.baseDist = dist; }
+      state.sessionDist = Math.max(0, dist - state.baseDist);
+      state.distanceMm = dist;
+    }
+    const bh = j.builder && j.builder.anchor ? parseInt(j.builder.anchor.blockHeight,10) : null;
+    if(!Number.isNaN(bh) && bh !== null){
+      if(state.baseBlock === null){ state.baseBlock = bh; }
+      if(bh > (state.block||0) && state.block !== null){
+        log(`Block ${bh} settled — new track unlocked.`);
+        newTrack(bh);
+      }
+      state.sessionBlocks = Math.max(0, bh - state.baseBlock);
+      state.block = bh;
+    }
+    state.lastOk = Date.now();
+    if(state.running !== wasRunning){
+      log(state.running ? `Squeektoshi is RUNNING at ${rpm.toFixed(1)} RPM.` : "The wheel stopped — nap mode.");
+      updateMood(true);
+    }
+    render();
+  }catch(e){
+    state.fresh = false;
+    render();
+  }
+}
+function fmtDist(mm){
+  if(mm === null) return "—";
+  if(mm >= 1000*1000) return (mm/1000000).toFixed(2)+" km";
+  if(mm >= 1000) return (mm/1000).toFixed(1)+" m";
+  return mm.toFixed(0)+" mm";
+}
+function render(){
+  $("rpm").textContent = state.rpm ? state.rpm.toFixed(1) : "0.0";
+  $("speed").textContent = state.speed.toFixed(0);
+  $("livedot").className = "dot" + (state.running ? " on" : "");
+  $("livetext").textContent = state.running ? "LIVE — HE'S RUNNING" : "ON AIR — NAP MODE";
+  $("st-state").textContent = state.running ? "Running" : "Sleeping";
+  const age = state.lastOk ? Math.round((Date.now()-state.lastOk)/1000) : null;
+  $("st-fresh").innerHTML = state.fresh
+    ? (age !== null ? `telemetry fresh · ${age}s ago` : "telemetry fresh")
+    : `<span class="stale">telemetry stale — keeping last good values</span>`;
+  $("st-block").textContent = state.block !== null ? "#"+state.block : "—";
+  $("st-dist").textContent = fmtDist(state.sessionDist);
+  $("st-blocks").textContent = state.sessionBlocks;
+  $("st-total").textContent = fmtDist(state.distanceMm);
+}
+
+/* ============ Track titles ============ */
+const ADJ = ["Midnight","Turbo","Velvet","Tiny","Cosmic","Sleepy","Golden","Electric","Fuzzy","Rapid","Mellow","Infinite"];
+const NOUN = ["Wheel Groove","Paw Steps","Seed Vault Blues","Burrow Waltz","RPM Reverie","Cheek Pouch Swing","Nap Sonata","Sprint Etude","Whisker Jam","Cage Free Jazz"];
+function newTrack(block){
+  const a = ADJ[block % ADJ.length], n = NOUN[(block*7) % NOUN.length];
+  $("track").textContent = `${a} ${n} (Block ${block})`;
+}
+function updateMood(announce){
+  $("mood").textContent = state.running
+    ? `Groove mode — tempo follows the wheel at ${state.rpm.toFixed(1)} RPM.`
+    : "Nap mode — slow ambient pads while Squeektoshi recharges.";
+  if(announce && engine.on) engine.retarget();
+}
+
+/* ============ Wheel drawing ============ */
+const cv = $("wheel"), ctx = cv.getContext("2d");
+let angle = 0, lastFrame = performance.now();
+const HAMSTER = [
+"................",
+".....oo....oo...",
+"....oOOo..oOOo..",
+"....oOOooooOOo..",
+".....oooooooo...",
+"....ooEooooEoo..",
+"....oooooooooo..",
+".....ooonn oo...",
+"....oooooooooo..",
+"...oooooooooooo.",
+"...oo.oooooo.oo.",
+"....oooooooooo..",
+".....oo..oo.....",
+"....oo....oo....",
+"................",
+"................"];
+function drawHamster(x,y,s){
+  const colors = {o:"#c98d4e", O:"#e8b06a", E:"#221503", n:"#ff8fb2"};
+  for(let r=0;r<HAMSTER.length;r++){
+    for(let c=0;c<HAMSTER[r].length;c++){
+      const ch = HAMSTER[r][c];
+      if(ch === "." || ch === " ") continue;
+      ctx.fillStyle = colors[ch] || "#c98d4e";
+      ctx.fillRect(x + c*s, y + r*s, s, s);
+    }
+  }
+}
+function draw(now){
+  const dt = Math.min(0.05,(now-lastFrame)/1000); lastFrame = now;
+  const revPerSec = (state.rpm/60) * 0.35; /* slowed for watchability */
+  angle += revPerSec * Math.PI*2 * dt * (state.running?1:0.06);
+  const W = cv.width, C = W/2, R = W*0.42;
+  ctx.clearRect(0,0,W,W);
+  ctx.save(); ctx.translate(C,C); ctx.rotate(angle);
+  ctx.strokeStyle = "#ffb62e"; ctx.lineWidth = W*0.03;
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = "#8a5a1d"; ctx.lineWidth = W*0.012;
+  for(let i=0;i<8;i++){
+    const a = i*Math.PI/4;
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(a)*R, Math.sin(a)*R); ctx.stroke();
+  }
+  ctx.fillStyle = "#ff8a3d";
+  ctx.beginPath(); ctx.arc(0,0,W*0.045,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  /* hamster rides the bottom-inside of the wheel */
+  const hx = C - 8*9, hy = C + R - 16*9 - 6;
+  drawHamster(hx, hy, 9);
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+/* ============ Music engine (WebAudio, generative) ============ */
+const engine = {
+  ctx:null, master:null, on:false, step:0, timer:null, nextTime:0,
+  mode:"nap",
+  start(){
+    if(!this.ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = $("vol").value/100 * 0.5;
+      this.master.connect(this.ctx.destination);
+    }
+    this.ctx.resume();
+    this.on = true;
+    this.step = 0;
+    this.nextTime = this.ctx.currentTime + 0.1;
+    this.mode = state.running ? "run" : "nap";
+    const tick = () => { this.schedule(); };
+    this.timer = setInterval(tick, 40);
+    log("Radio on — " + (this.mode === "run" ? "groove mode." : "nap mode."));
+    updateMood(false);
+  },
+  stop(){
+    this.on = false;
+    if(this.timer) clearInterval(this.timer);
+    if(this.ctx) this.ctx.suspend();
+    log("Radio off.");
+  },
+  retarget(){ this.mode = state.running ? "run" : "nap"; },
+  bpm(){ return this.mode === "run" ? Math.min(164, Math.max(96, 62 + state.rpm*1.35)) : 52; },
+  schedule(){
+    if(!this.on) return;
+    const spb = 60/this.bpm()/2; /* eighth notes */
+    while(this.nextTime < this.ctx.currentTime + 0.14){
+      this.playStep(this.step, this.nextTime);
+      this.nextTime += spb;
+      this.step++;
+    }
+  },
+  note(freq, t, dur, type, vol, dest){
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(dest || this.master);
+    o.start(t); o.stop(t+dur+0.05);
+  },
+  pad(freqs, t, dur){
+    freqs.forEach(f => {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05, t+dur*0.3);
+      g.gain.linearRampToValueAtTime(0.0, t+dur);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t+dur+0.1);
+    });
+  },
+  hat(t, vol){
+    const len = 0.03, buf = this.ctx.createBuffer(1, this.ctx.sampleRate*len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1)*(1-i/d.length);
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const f = this.ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 7000;
+    const g = this.ctx.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t);
+  },
+  playStep(s, t){
+    const PENTA = [0,2,4,7,9];
+    const root = this.mode === "run" ? 196.00 : 146.83; /* G3 / D3 */
+    const bar = Math.floor(s/8);
+    if(s % 32 === 0){
+      const chords = this.mode === "run"
+        ? [[0,4,7],[5,9,12],[7,11,14],[4,7,11]]
+        : [[0,4,7],[ -3,0,4],[5,9,12],[ -1,2,5]];
+      const ch = chords[(bar>>2) % chords.length];
+      this.pad(ch.map(n => root*Math.pow(2,n/12)/2), t, this.mode === "run" ? 60/this.bpm()*4 : 60/this.bpm()*8);
+    }
+    if(this.mode === "run"){
+      if(s % 4 === 0) this.note(root/2, t, 0.22, "sine", 0.20);
+      if(s % 2 === 0) this.hat(t, s % 4 === 2 ? 0.05 : 0.028);
+      const density = Math.min(0.9, 0.35 + state.rpm/140);
+      if(Math.random() < density){
+        const deg = PENTA[Math.floor(Math.random()*PENTA.length)];
+        const oct = Math.random() < 0.3 ? 24 : 12;
+        this.note(root*Math.pow(2,(deg+oct)/12), t, 0.16, "square", 0.045);
+      }
+      if(s % 16 === 8) this.note(root*2, t, 0.3, "triangle", 0.06);
+    }else{
+      if(s % 16 === 0 && Math.random() < 0.8){
+        const deg = PENTA[Math.floor(Math.random()*PENTA.length)];
+        this.note(root*2*Math.pow(2,deg/12), t, 1.4, "sine", 0.05);
+      }
+      if(s % 32 === 16 && Math.random() < 0.5){
+        this.note(root*Math.pow(2,7/12), t, 1.8, "sine", 0.035);
+      }
+    }
+  }
+};
+$("play").addEventListener("click", () => {
+  if(engine.on){ engine.stop(); $("play").innerHTML = "▶&nbsp; Start the radio"; }
+  else{ engine.start(); $("play").innerHTML = "⏸&nbsp; Pause the radio"; }
+});
+$("vol").addEventListener("input", e => {
+  if(engine.master) engine.master.gain.value = e.target.value/100 * 0.5;
+});
+
+/* ============ Clocks ============ */
+setInterval(() => {
+  const sec = Math.floor((Date.now()-state.startedAt)/1000);
+  $("st-time").textContent = Math.floor(sec/60) + ":" + String(sec%60).padStart(2,"0");
+  render();
+}, 1000);
+poll();
+setInterval(poll, 15000);
+log("WHEELY FM on air — reading the WHEELY9000 telemetry.");
+</script>
+</body>
+</html>
